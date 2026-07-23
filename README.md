@@ -1,6 +1,6 @@
 # MedSenseAI
 
-Safe medical report understanding assistant for rural and non-technical users.
+Safe medical report understanding assistant.
 
 MedSenseAI helps users understand medical reports, identify abnormal values, view patient-friendly explanations, and prepare better questions for a doctor. It is not a diagnosis or treatment system.
 
