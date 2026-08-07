@@ -1,5 +1,13 @@
+import uuid
+from pathlib import Path
+
 from django.conf import settings
 from django.db import models
+
+
+def medical_report_upload_path(instance, filename):
+    suffix = Path(filename).suffix.lower()
+    return f"medical_reports/{uuid.uuid4().hex}{suffix}"
 
 
 class MedicalReport(models.Model):
@@ -25,7 +33,7 @@ class MedicalReport(models.Model):
         blank=True,
     )
 
-    file = models.FileField(upload_to="medical_reports/")
+    file = models.FileField(upload_to=medical_report_upload_path)
     original_filename = models.CharField(max_length=255, blank=True)
 
     report_type = models.CharField(max_length=100, blank=True)
@@ -49,7 +57,6 @@ class MedicalReport(models.Model):
     )
 
     error_message = models.TextField(blank=True)
-    
     parser_mode = models.CharField(max_length=50, blank=True)
     parser_message = models.TextField(blank=True)
 
@@ -93,11 +100,11 @@ class MedicalTestResult(models.Model):
     simple_explanation = models.TextField(blank=True)
     explanation_sources = models.JSONField(default=list, blank=True)
     doctor_questions = models.JSONField(default=list, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.test_name}: {self.value} {self.unit}"
+
 
 class MedicalKnowledgeDocument(models.Model):
     REPORT_TYPE_CHOICES = [
@@ -113,7 +120,11 @@ class MedicalKnowledgeDocument(models.Model):
     title = models.CharField(max_length=255)
     source_name = models.CharField(max_length=100)
     source_url = models.URLField(blank=True)
-    report_type = models.CharField(max_length=50, choices=REPORT_TYPE_CHOICES, default="general")
+    report_type = models.CharField(
+        max_length=50,
+        choices=REPORT_TYPE_CHOICES,
+        default="general",
+    )
     test_names = models.JSONField(default=list, blank=True)
     content = models.TextField()
     is_active = models.BooleanField(default=True)
@@ -128,12 +139,6 @@ class MedicalKnowledgeDocument(models.Model):
 
 
 class SafetyAuditLog(models.Model):
-    """
-    Stores safety review results for each AI-generated report output.
-    This makes MedSenseAI auditable: diagnosis, prescription, dosage, and false-reassurance
-    language can be detected, blocked, and reviewed later.
-    """
-
     SAFETY_STATUS_CHOICES = [
         ("passed", "Passed"),
         ("review_required", "Review Required"),

@@ -1,3 +1,7 @@
+import mimetypes
+from pathlib import Path
+
+from django.http import FileResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -34,14 +38,14 @@ def _get_owned_report_or_404(request, report_id, prefetch_tests: bool = False):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def upload_report(request):
+    uploaded_file = request.FILES.get("file")
     serializer = MedicalReportSerializer(data=request.data)
 
     if serializer.is_valid():
-        report = serializer.save(user=request.user)
-
-        if report.file:
-            report.original_filename = report.file.name.split("/")[-1]
-            report.save(update_fields=["original_filename"])
+        report = serializer.save(
+            user=request.user,
+            original_filename=uploaded_file.name if uploaded_file else "",
+        )
 
         return Response(
             {
@@ -52,6 +56,40 @@ def upload_report(request):
         )
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_report_file(request, report_id):
+    report, error_response = _get_owned_report_or_404(request, report_id)
+
+    if error_response:
+        return error_response
+
+    if not report.file:
+        return Response(
+            {"error": "No file is associated with this report."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        file_handle = report.file.open("rb")
+    except (FileNotFoundError, OSError):
+        return Response(
+            {"error": "Report file could not be found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    stored_name = Path(report.file.name).name
+    download_name = report.original_filename or stored_name
+    content_type, _ = mimetypes.guess_type(download_name)
+
+    return FileResponse(
+        file_handle,
+        as_attachment=True,
+        filename=download_name,
+        content_type=content_type or "application/octet-stream",
+    )
 
 
 @api_view(["GET"])

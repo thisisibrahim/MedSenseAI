@@ -5,6 +5,7 @@ urlpatterns = [
     path("upload/", views.upload_report, name="upload_report"),
     path("", views.list_reports, name="list_reports"),
     path("<int:report_id>/", views.report_detail, name="report_detail"),
+    path("<int:report_id>/download/", views.download_report_file, name="download_report_file"),
     path("<int:report_id>/patient-view/", views.patient_friendly_report_view, name="patient_friendly_report_view"),
     path("<int:report_id>/extract-text/", views.extract_report_text, name="extract_report_text"),
     path("<int:report_id>/parse/", views.parse_report, name="parse_report"),
