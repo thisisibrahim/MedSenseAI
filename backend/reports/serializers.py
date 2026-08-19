@@ -16,6 +16,7 @@ class MedicalReportSerializer(serializers.ModelSerializer):
     test_results = MedicalTestResultSerializer(many=True, read_only=True)
     owner_username = serializers.CharField(source="user.username", read_only=True)
     download_url = serializers.SerializerMethodField()
+    file = serializers.FileField(write_only=True)   # ← added
 
     def get_download_url(self, obj):
         return f"/api/reports/{obj.id}/download/"
@@ -23,19 +24,13 @@ class MedicalReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicalReport
         fields = [
-            "id", "owner_username", "download_url", "original_filename",
+            "id", "owner_username", "download_url", "file", "original_filename",  # ← "file" added here
             "report_type", "patient_age", "patient_gender", "extracted_text",
             "ai_summary", "safety_note", "overall_risk_level", "status",
             "error_message", "parser_mode", "parser_message", "test_results",
             "created_at", "updated_at",
         ]
-        read_only_fields = [
-            "owner_username", "download_url", "original_filename",
-            "report_type", "patient_age", "patient_gender", "extracted_text",
-            "ai_summary", "safety_note", "overall_risk_level", "status",
-            "error_message", "parser_mode", "parser_message", "test_results",
-            "created_at", "updated_at",
-        ]
+        # read_only_fields unchanged — "file" isn't in it, so it stays writable on input
 
 
 class MedicalKnowledgeDocumentSerializer(serializers.ModelSerializer):
