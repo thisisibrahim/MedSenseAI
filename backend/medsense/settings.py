@@ -149,7 +149,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Gemini API config for AI parsing. Keep the real key in .env, never in code.
-GOOGLE_API_KEY = os.getenv("AQ.Ab8RN6LYTGKfKjhIge_zx3xJ2cNhJoBBeQJ-AjBdJx1vNIvSpg", "")
+GOOGLE_API_KEY = os.getenv(" ", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # LangChain/Gemini config
