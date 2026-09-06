@@ -149,12 +149,23 @@ Users can export a patient-friendly report summary as a PDF using the browser pr
 
 ### DevOps / Tooling
 
-- Git
-- GitHub
-- Dockerfile
-- Docker Compose
-- `.env.example`
-- `.gitignore`
+**Development (containerized, tested and working):**
+
+- Docker & Docker Compose — `docker compose up` runs backend (Django dev server) and frontend (Vite dev server) together
+- SQLite (local dev database)
+
+**Production (configured, not yet deployed live):**
+
+- Gunicorn — WSGI server for the Django backend
+- Nginx — serves the built frontend and proxies `/api` and `/media` to the backend
+- PostgreSQL — production database
+- Caddy — reverse proxy with automatic HTTPS (Let's Encrypt)
+- Separate `docker-compose.prod.yml` covering all of the above
+
+**General:**
+
+- Git, GitHub
+- `.env.example`, `.gitignore`
 
 ---
 
@@ -205,7 +216,9 @@ MedSenseAI/
 │   ├── reports/
 │   ├── manage.py
 │   ├── requirements.txt
-│   └── Dockerfile
+│   ├── Dockerfile           # dev image (runserver)
+│   ├── .env.docker          # env vars for `docker compose up`
+│   └── .env.prod            # env vars for production compose (not committed)
 │
 ├── frontend/
 │   ├── src/
@@ -213,10 +226,15 @@ MedSenseAI/
 │   │   ├── main.jsx
 │   │   └── styles.css
 │   ├── package.json
-│   └── Dockerfile
+│   ├── vite.config.js       # dev proxy target configurable via VITE_API_PROXY_TARGET
+│   ├── Dockerfile           # dev image (Vite dev server)
+│   └── nginx.conf           # used only by the production frontend image
 │
 ├── docs/
-├── docker-compose.yml
+├── docker-compose.yml        # local dev: backend + frontend, SQLite
+├── docker-compose.prod.yml   # production: + Postgres, Gunicorn, Nginx, Caddy/HTTPS
+├── Caddyfile                 # reverse proxy + automatic HTTPS config (production)
+├── DEPLOYMENT.md             # step-by-step production deployment guide
 ├── README.md
 ├── .env.example
 └── .gitignore
@@ -226,7 +244,36 @@ MedSenseAI/
 
 ## Local Setup
 
-### Backend
+You can run MedSenseAI either with Docker (recommended, fastest to get started) or manually.
+
+### Option A: Docker (recommended)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+From the repo root:
+
+```bash
+docker compose up
+```
+
+This builds and starts both containers:
+
+```text
+Frontend: http://localhost:5173/
+Backend:  http://localhost:8000/
+```
+
+Environment variables for the Docker setup come from `backend/.env.docker` (see [Environment Variables](#environment-variables) below). Make sure that file exists with a real `GOOGLE_API_KEY` before starting.
+
+To stop:
+
+```bash
+docker compose down
+```
+
+### Option B: Manual setup
+
+#### Backend
 
 ```bash
 cd backend
@@ -250,7 +297,7 @@ Backend runs at:
 http://127.0.0.1:8000/
 ```
 
-### Frontend
+#### Frontend
 
 Open another terminal:
 
@@ -276,6 +323,8 @@ Create this file:
 backend/.env
 ```
 
+(or `backend/.env.docker` if running via Docker Compose — same variables, different file so local and containerized runs don't clash)
+
 Use `.env.example` as reference:
 
 ```env
@@ -290,6 +339,8 @@ TESSERACT_CMD=C:/Program Files/Tesseract-OCR/tesseract.exe
 OCR_DPI=300
 LANGCHAIN_VERBOSE=false
 ```
+
+> **Never commit real `.env`, `.env.docker`, or `.env.prod` files.** `SECRET_KEY`, `GOOGLE_API_KEY`, and database credentials must only ever live in these gitignored env files — never hardcoded in `settings.py` or any other source file.
 
 ---
 
@@ -319,7 +370,6 @@ GET  /api/reports/<report_id>/safety-audits/
 ```
 
 The download endpoint requires authentication and verifies report ownership before serving the file.
-
 
 ### Knowledge Base
 
@@ -370,13 +420,25 @@ The backend includes security tests for owner access, anonymous access, cross-us
 
 ---
 
+## Production Deployment (Configured, Not Yet Live)
+
+A full production setup has been built and is ready to deploy behind a VPS and domain — it just hasn't been pointed at one yet:
+
+- `docker-compose.prod.yml` — Postgres, Gunicorn-served backend, Nginx-served frontend, and Caddy for automatic HTTPS, all networked together with no ports exposed except through Caddy
+- Django `settings.py` reads `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, and `DATABASE_URL` from environment variables, falling back to safe local-dev defaults when unset
+- `DEPLOYMENT.md` walks through the full deploy: VPS setup, DNS, env files, and the exact commands to bring the stack up
+
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the complete guide.
+
+---
+
 ## Why Not Publicly Deployed Yet
 
 MedSenseAI handles medical report uploads, which may contain sensitive personal data.
 
-The project is Docker-ready and deployment-ready. Uploaded medical reports are now protected from direct public `/media/` access, stored under randomized filenames, and served only through authenticated owner-only download endpoints.
+The project is Docker-ready and deployment-ready — it runs cleanly in Docker locally, and a full production configuration (Postgres, Gunicorn, Nginx, Caddy/HTTPS) is already built (see above). Uploaded medical reports are protected from direct public `/media/` access, stored under randomized filenames, and served only through authenticated owner-only download endpoints.
 
-A production deployment should additionally include a secure production database, private object/media storage, HTTPS, environment secret management, monitoring, retention policies, and cleanup of uploaded files.
+Going live only requires a VPS and a domain — the rest of the production checklist (secure database, HTTPS, environment secret management) is already handled by the setup in `docker-compose.prod.yml`. What's still worth adding before real users touch it: private object/media storage (e.g. S3-compatible), monitoring, retention policies, and automated cleanup of uploaded files.
 
 For now, the project is demonstrated locally with GitHub documentation and a demo video.
 
@@ -384,9 +446,10 @@ For now, the project is demonstrated locally with GitHub documentation and a dem
 
 ## Future Scope
 
-- Production deployment with Render/Railway/VPS
-- PostgreSQL database
-- Secure cloud file storage
+- Go live with the existing production Docker setup on a VPS + domain
+- Secure cloud/object file storage (S3-compatible) in place of local volume storage
+- Automated backups and file-retention cleanup jobs
+- CI/CD (GitHub Actions) for automatic build + deploy on push
 - Better OCR for low-quality images
 - More report types and lab formats
 - Doctor/admin review dashboard
@@ -408,7 +471,7 @@ Possible areas to improve:
 - UI/UX polish
 - Medical safety checks
 - Documentation
-- Deployment setup
+- Production deployment (going live on a VPS)
 - Broader automated test coverage
 
 If you find something that can be improved, feel free to open an issue or submit a pull request.
