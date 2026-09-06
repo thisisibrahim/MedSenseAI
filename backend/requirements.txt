@@ -44,3 +44,9 @@ langchain
 langchain-core
 langchain-google-genai
 pytesseract==0.3.13
+
+# --- Production additions ---
+gunicorn==23.0.0
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+whitenoise==6.8.2

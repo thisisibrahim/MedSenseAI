@@ -1,33 +1,64 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medsenseai_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medsenseai}
+      POSTGRES_USER: ${POSTGRES_USER:-medsenseai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real password in .env}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medsenseai}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: medsenseai_backend
-    ports:
-      - "8000:8000"
     env_file:
-      - ./backend/.env.docker
+      - ./backend/.env.prod
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-medsenseai}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medsenseai}
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - ./backend:/app
       - backend_media:/app/media
+      - backend_static:/app/staticfiles
     restart: unless-stopped
+    # no external ports — only reachable via the frontend/nginx proxy or Caddy
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: medsenseai_frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: medsenseai_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+
 volumes:
+  pg_data:
   backend_media:
+  backend_static:
+  caddy_data:
+  caddy_config:

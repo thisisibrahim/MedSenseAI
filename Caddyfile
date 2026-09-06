@@ -1,0 +1,3 @@
+medsense.ai {
+    reverse_proxy frontend:80
+}
