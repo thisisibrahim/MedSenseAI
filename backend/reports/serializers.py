@@ -30,6 +30,7 @@ class MedicalReportSerializer(serializers.ModelSerializer):
             "error_message", "parser_mode", "parser_message", "test_results",
             "created_at", "updated_at",
         ]
+        # read_only_fields unchanged — "file" isn't in it, so it stays writable on input
 
 
 class MedicalKnowledgeDocumentSerializer(serializers.ModelSerializer):

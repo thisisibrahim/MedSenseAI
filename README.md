@@ -23,6 +23,8 @@ Safe AI medical report understanding assistant built with Django REST Framework,
 - Show trusted medical context using RAG-style retrieval
 - Run safety checks to avoid unsafe medical claims
 - Keep private report history for each logged-in user
+- Protect uploaded report files behind authenticated, owner-only download endpoints
+- Store medical report files under randomized UUID-based filenames
 - Export a patient-friendly PDF summary
 
 ---
@@ -99,8 +101,15 @@ Each user has:
 - Logout
 - Private report uploads
 - Private report history
+- Authenticated report-file downloads
 
-Users cannot see reports uploaded by other users.
+Medical report files are no longer exposed through Django's public `/media/` route.
+
+Uploaded files are stored with randomized UUID-based filenames, while the original filename is preserved separately for user-facing downloads.
+
+Users can only download files that belong to their own account through an ownership-checked API endpoint.
+
+Users cannot see or download reports uploaded by other users.
 
 ### English and Hindi Views
 
@@ -175,6 +184,10 @@ Patient Explanation Generator
 Safety Guardrail Review
  ↓
 English/Hindi Patient View
+ ↓
+Private Report Storage
+ ↓
+Authenticated Owner-Only Download
  ↓
 Report History + PDF Export
 ```
@@ -297,6 +310,7 @@ POST /api/auth/logout/
 POST /api/reports/upload/
 GET  /api/reports/
 GET  /api/reports/<report_id>/
+GET  /api/reports/<report_id>/download/
 POST /api/reports/<report_id>/extract-text/
 POST /api/reports/<report_id>/parse/
 GET  /api/reports/<report_id>/patient-view/?language=en
@@ -304,12 +318,40 @@ GET  /api/reports/<report_id>/patient-view/?language=hi
 GET  /api/reports/<report_id>/safety-audits/
 ```
 
+The download endpoint requires authentication and verifies report ownership before serving the file.
+
+
 ### Knowledge Base
 
 ```text
 GET  /api/reports/knowledge/
 POST /api/reports/knowledge/seed/
 ```
+
+---
+
+## Secure Report File Handling
+
+Medical reports may contain sensitive personal information, so uploaded files are treated as private application data.
+
+Current protections include:
+
+- Direct Django `/media/` serving is disabled for medical report files
+- Uploaded files are stored using randomized UUID-based filenames
+- Original filenames are stored separately for user-facing downloads
+- Raw file URLs are not exposed through the report serializer
+- Files are downloaded through:
+
+```text
+GET /api/reports/<report_id>/download/
+```
+
+- The download endpoint requires authentication
+- Ownership is checked before the file is returned
+- Cross-user access returns `404`
+- Anonymous access is blocked
+
+The backend includes security tests for owner access, anonymous access, cross-user access, direct `/media/` access, serializer exposure, and randomized storage filenames.
 
 ---
 
@@ -332,7 +374,9 @@ POST /api/reports/knowledge/seed/
 
 MedSenseAI handles medical report uploads, which may contain sensitive personal data.
 
-The project is Docker-ready and deployment-ready, but public deployment should include secure production database, secure media storage, HTTPS, strong access control, environment secret management, monitoring, and cleanup of uploaded files.
+The project is Docker-ready and deployment-ready. Uploaded medical reports are now protected from direct public `/media/` access, stored under randomized filenames, and served only through authenticated owner-only download endpoints.
+
+A production deployment should additionally include a secure production database, private object/media storage, HTTPS, environment secret management, monitoring, retention policies, and cleanup of uploaded files.
 
 For now, the project is demonstrated locally with GitHub documentation and a demo video.
 
@@ -349,7 +393,7 @@ For now, the project is demonstrated locally with GitHub documentation and a dem
 - Report comparison over time
 - Better multilingual support
 - Real OAuth login
-- Automated test suite
+- Broader automated test coverage across OCR, parsing, safety, and frontend flows
 
 ---
 
@@ -365,7 +409,7 @@ Possible areas to improve:
 - Medical safety checks
 - Documentation
 - Deployment setup
-- Test coverage
+- Broader automated test coverage
 
 If you find something that can be improved, feel free to open an issue or submit a pull request.
 
